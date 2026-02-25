@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SkyNAS Photo Sync</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            display: block;
+            padding: 40px 20px;
+            border: 3px dashed #ddd;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #888;
+        }
+
+        .file-input-label:hover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .file-input-label.active {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .upload-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .upload-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .upload-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .progress-container {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 4px;
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            display: none;
+        }
+
+        .status.success {
+            display: block;
+            background: rgba(76, 175, 80, 0.1);
+            color: #4CAF50;
+        }
+
+        .status.error {
+            display: block;
+            background: rgba(244, 67, 54, 0.1);
+            color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1> SkyNAS</h1>
+        <p class="subtitle">同步照片到 Mac</p>
+
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="album">相册名称</label>
+                <input type="text" id="album" name="album" placeholder="例如：旅行、生日" value="未分类">
+            </div>
+
+            <div class="form-group">
+                <label>选择照片</label>
+                <div class="file-input-wrapper">
+                    <input type="file" id="photos" name="photos" accept="image/*,video/*" multiple capture="environment">
+                    <label for="photos" class="file-input-label">
+                        <div> 点击选择照片</div>
+                        <div style="font-size: 12px; margin-top: 8px;">支持照片和视频</div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div id="fileList" style="margin-top: 10px; font-size: 14px; color: #666;"></div>
+            </div>
+
+            <button type="submit" class="upload-btn" id="uploadBtn">
+                开始同步
+            </button>
+        </form>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">0%</div>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('photos');
+        const fileInputLabel = document.querySelector('.file-input-label');
+        const fileList = document.getElementById('fileList');
+        const form = document.getElementById('uploadForm');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const status = document.getElementById('status');
+
+        let selectedFiles = [];
+
+        fileInput.addEventListener('change', (e) => {
+            selectedFiles = Array.from(e.target.files);
+            if (selectedFiles.length > 0) {
+                fileInputLabel.classList.add('active');
+                fileInputLabel.innerHTML = `<div> 已选择 ${selectedFiles.length} 个文件</div>`;
+
+                const totalSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+                const sizeMB = (totalSize / 1024 / 1024).toFixed(1);
+                fileList.textContent = `总大小: ${sizeMB} MB`;
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (selectedFiles.length === 0) {
+                showStatus('请先选择照片', 'error');
+                return;
+            }
+
+            uploadBtn.disabled = true;
+            progressContainer.style.display = 'block';
+            status.style.display = 'none';
+
+            const album = document.getElementById('album').value || '未分类';
+            let uploadedCount = 0;
+
+            for (const file of selectedFiles) {
+                try {
+                    await uploadFile(file, album, (progress) => {
+                        const fileProgress = ((uploadedCount + progress) / selectedFiles.length) * 100;
+                        progressFill.style.width = fileProgress + '%';
+                        progressText.textContent = Math.round(fileProgress) + '%';
+                    });
+                    uploadedCount++;
+                } catch (err) {
+                    showStatus(`上传失败: ${err.message}`, 'error');
+                    uploadBtn.disabled = false;
+                    return;
+                }
+            }
+
+            progressFill.style.width = '100%';
+            progressText.textContent = '完成!';
+            showStatus(`成功同步 ${uploadedCount} 个文件`, 'success');
+
+            // Reset form
+            selectedFiles = [];
+            fileInput.value = '';
+            fileInputLabel.classList.remove('active');
+            fileInputLabel.innerHTML = '<div> 点击选择照片</div><div style="font-size: 12px; margin-top: 8px;">支持照片和视频</div>';
+            fileList.textContent = '';
+            uploadBtn.disabled = false;
+        });
+
+        async function uploadFile(file, album, onProgress) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('album', album);
+
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        onProgress(e.loaded / e.total);
+                    }
+                });
+
+                xhr.addEventListener('load', () => {
+                    if (xhr.status === 200) {
+                        resolve();
+                    } else {
+                        reject(new Error(xhr.responseText || '上传失败'));
+                    }
+                });
+
+                xhr.addEventListener('error', () => reject(new Error('网络错误')));
+                xhr.addEventListener('abort', () => reject(new Error('上传取消')));
+
+                xhr.open('POST', '/api/upload');
+                xhr.send(formData);
+            });
+        }
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = 'status ' + type;
+        }
+    </script>
+</body>
+</html>
