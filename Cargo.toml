@@ -1,0 +1,46 @@
+[package]
+name = "skynas"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Async runtim/e and web framework
+tokio = { version = "1.35", features = ["full"] }
+axum = { version = "0.7", features = ["multipart", "ws"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
+
+# Database
+rusqlite = { version = "0.30", features = ["bundled", "chrono"] }
+
+# Configuration
+config = "0.14"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+
+# QR Code generation
+qrcode = "0.14"
+qrcodegen = "1.8"
+
+# Network and mDNS
+zeroconf = "0.15"
+local-ip-address = "0.6"
+
+# System notifications
+notify-rust = "4.11"
+
+# Image processing
+image = "0.24"
+
+# Utilities
+anyhow = "1.0"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+hex = "0.4"
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+walkdir = "2.4"
+dirs = "5.0"
+clap = { version = "4.4", features = ["derive"] }
