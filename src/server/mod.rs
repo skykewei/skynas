@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::db::Database;
+use crate::websocket::{create_event_channel, ws_handler, EventSender};
 use axum::{
     extract::{Multipart, State},
     http::StatusCode,
@@ -16,28 +17,25 @@ use tower_http::services::ServeDir;
 mod upload;
 use upload::{complete_upload, get_upload_status, init_upload, upload_chunk};
 
+#[derive(Clone)]
 pub struct AppState {
     pub config: Config,
     pub db: Arc<Mutex<Database>>,
-}
-
-impl Clone for AppState {
-    fn clone(&self) -> Self {
-        Self {
-            config: self.config.clone(),
-            db: Arc::clone(&self.db),
-        }
-    }
+    pub event_sender: EventSender,
 }
 
 pub async fn run_server(config: Config, db: Database) -> anyhow::Result<()> {
+    let (event_sender, _) = create_event_channel();
+
     let state = AppState {
         config: config.clone(),
         db: Arc::new(Mutex::new(db)),
+        event_sender,
     };
 
     let app = Router::new()
         .route("/", get(index_handler))
+        .route("/ws", get(ws_handler))
         .route("/api/upload", post(upload_handler))
         .route("/api/upload/chunked/init", post(init_upload))
         .route("/api/upload/chunked/chunk", post(upload_chunk))

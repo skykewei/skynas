@@ -7,6 +7,7 @@ mod notify;
 mod qr;
 mod server;
 mod sync;
+mod websocket;
 
 use config::Config;
 use db::Database;
