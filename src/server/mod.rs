@@ -13,6 +13,9 @@ use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 
+mod upload;
+use upload::{complete_upload, get_upload_status, init_upload, upload_chunk};
+
 pub struct AppState {
     pub config: Config,
     pub db: Arc<Mutex<Database>>,
@@ -36,6 +39,10 @@ pub async fn run_server(config: Config, db: Database) -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(index_handler))
         .route("/api/upload", post(upload_handler))
+        .route("/api/upload/chunked/init", post(init_upload))
+        .route("/api/upload/chunked/chunk", post(upload_chunk))
+        .route("/api/upload/chunked/complete/:upload_id", post(complete_upload))
+        .route("/api/upload/chunked/status/:upload_id", get(get_upload_status))
         .route("/api/health", get(health_handler))
         .nest_service("/static", ServeDir::new("src/server/static"))
         .layer(CorsLayer::permissive())
