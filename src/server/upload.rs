@@ -189,6 +189,15 @@ pub async fn complete_upload(
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
 
+    // Show notification
+    crate::notify::show_upload_complete(1, &session.album);
+
+    // Trigger cloud sync if enabled
+    let sync_manager = crate::sync::SyncManager::new(state.config.clone());
+    if state.config.sync.auto_sync {
+        let _ = sync_manager.spawn_sync_task(state.config.sync.sync_delay_seconds);
+    }
+
     // Clean up upload session
     {
         let db = state.db.lock().await;

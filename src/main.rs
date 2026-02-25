@@ -2,8 +2,10 @@ mod config;
 mod db;
 mod mdns;
 mod models;
+mod notify;
 mod qr;
 mod server;
+mod sync;
 
 use config::Config;
 use db::Database;
