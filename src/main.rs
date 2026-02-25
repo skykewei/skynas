@@ -1,5 +1,6 @@
 mod config;
 mod db;
+mod mdns;
 mod models;
 mod qr;
 mod server;
@@ -17,6 +18,20 @@ async fn main() -> anyhow::Result<()> {
 
     let host = get_best_host(&config.server.host);
     print_server_info(&host, config.server.port);
+
+    // Start mDNS in a separate thread if enabled
+    if config.features.mdns_enabled {
+        let port = config.server.port;
+        std::thread::spawn(move || {
+            let device_id = mdns::generate_device_id();
+            let service_name = format!("SkyNAS-{}", device_id);
+
+            let mut mdns = mdns::MdnsPublisher::new();
+            if let Err(e) = mdns.publish(&service_name, port, &device_id) {
+                eprintln!("Failed to start mDNS: {}", e);
+            }
+        });
+    }
 
     // Run server
     server::run_server(config, db).await?;
