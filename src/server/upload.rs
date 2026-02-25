@@ -171,6 +171,15 @@ pub async fn complete_upload(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let file_hash = format!("{:x}", sha2::Sha256::digest(&file_data));
 
+    // Try HEIC conversion
+    let converter = crate::converter::HeicConverter::new(state.config.heic_converter.clone());
+    let has_jpeg = if let Ok(Some(_jpeg_path)) = converter.convert(&final_path) {
+        println!("Converted HEIC to JPEG: {:?}", _jpeg_path);
+        true
+    } else {
+        false
+    };
+
     // Save to database
     {
         let db = state.db.lock().await;
@@ -183,7 +192,7 @@ pub async fn complete_upload(
             created_at: None,
             uploaded_at: chrono::Utc::now(),
             local_path: final_path.to_string_lossy().to_string(),
-            has_jpeg_variant: false,
+            has_jpeg_variant: has_jpeg,
         };
         db.insert_photo(&photo)
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
