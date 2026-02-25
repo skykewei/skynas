@@ -1,3 +1,4 @@
+mod cli;
 mod config;
 mod converter;
 mod db;
@@ -9,6 +10,8 @@ mod server;
 mod sync;
 mod websocket;
 
+use cli::{Cli, Commands};
+use clap::Parser;
 use config::Config;
 use db::Database;
 use qr::{print_server_info, get_best_host};
@@ -17,7 +20,47 @@ use qr::{print_server_info, get_best_host};
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let config = Config::load()?;
+    let cli = Cli::parse();
+
+    // Handle subcommands
+    match cli.command {
+        Some(Commands::Start { background }) => {
+            if background {
+                println!("Starting SkyNAS in background mode...");
+                // TODO: Implement daemonization
+            }
+            run_server(cli.port).await
+        }
+        Some(Commands::Stop) => {
+            println!("Stopping SkyNAS...");
+            // TODO: Implement stop signal
+            Ok(())
+        }
+        Some(Commands::Status) => {
+            println!("Checking SkyNAS status...");
+            // TODO: Check if server is running
+            Ok(())
+        }
+        Some(Commands::MenuBar) => {
+            println!("Starting SkyNAS menu bar app...");
+            // TODO: Implement menu bar
+            Ok(())
+        }
+        None => {
+            // Default: run server interactively
+            run_server(cli.port).await
+        }
+    }
+}
+
+async fn run_server(port_override: Option<u16>) -> anyhow::Result<()> {
+    let mut config = Config::load()?;
+
+    // Override port if specified via CLI
+    if let Some(port) = port_override {
+        config.server.port = port;
+    }
+
     let db = Database::new(&config.storage.db_path)?;
 
     let host = get_best_host(&config.server.host);
