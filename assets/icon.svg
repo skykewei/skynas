@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
+    </linearGradient>
+    <linearGradient id="cloud" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#e0e7ff"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.15"/>
+    </filter>
+    <filter id="inner-shadow">
+      <feOffset dx="0" dy="-4"/>
+      <feGaussianBlur stdDeviation="4" result="offset-blur"/>
+      <feComposite operator="out" in="SourceGraphic" in2="offset-blur" result="inverse"/>
+      <feFlood flood-color="white" flood-opacity="0.3" result="color"/>
+      <feComposite operator="in" in="color" in2="inverse" result="shadow"/>
+      <feComposite operator="over" in="shadow" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+
+  <!-- Cloud shape -->
+  <g transform="translate(512, 480)" filter="url(#shadow)">
+    <path d="M-160,80 Q-200,80 -200,40 Q-200,0 -160,0 Q-160,-80 -80,-80 Q-40,-80 -20,-50 Q0,-100 60,-100 Q120,-100 140,-50 Q160,-80 200,-50 Q240,-20 240,40 Q240,80 200,80 Z"
+          fill="url(#cloud)" transform="translate(-120, -40) scale(1.2)"/>
+  </g>
+
+  <!-- Photo/Upload symbol -->
+  <g transform="translate(512, 520)" filter="url(#shadow)">
+    <!-- Photo frame -->
+    <rect x="-100" y="-80" width="200" height="160" rx="16" fill="#4f46e5" opacity="0.9"/>
+    <rect x="-90" y="-70" width="180" height="140" rx="12" fill="#ffffff"/>
+
+    <!-- Mountain -->
+    <path d="M-70,50 L-30,10 L-10,40 L20,0 L70,50 Z" fill="#818cf8"/>
+
+    <!-- Sun -->
+    <circle cx="45" cy="-35" r="18" fill="#fbbf24"/>
+
+    <!-- Upload arrow -->
+    <g transform="translate(120, -20)">
+      <circle cx="0" cy="0" r="40" fill="#10b981"/>
+      <path d="M-15,5 L0,-15 L15,5 M0,-15 L0,25" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </g>
+  </g>
+</svg>
