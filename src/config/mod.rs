@@ -95,7 +95,7 @@ impl Config {
             let user_config_path = config_dir.join("skynas").join("config.toml");
             if user_config_path.exists() {
                 let content = std::fs::read_to_string(&user_config_path)?;
-                let user_config: toml::Value = toml::from_str(&content)?;
+                let _user_config: toml::Value = toml::from_str(&content)?;
 
                 // Merge user config with default (simplified - can use config crate for deep merge)
                 // For now, just return default
@@ -103,10 +103,10 @@ impl Config {
         }
 
         // Override with environment variables if needed
-        if let Ok(port) = std::env::var("SKYNAS_PORT") {
-            if let Ok(port_num) = port.parse::<u16>() {
-                config.server.port = port_num;
-            }
+        if let Ok(port) = std::env::var("SKYNAS_PORT")
+            && let Ok(port_num) = port.parse::<u16>()
+        {
+            config.server.port = port_num;
         }
 
         // Ensure directories exist
@@ -116,6 +116,7 @@ impl Config {
         Ok(config)
     }
 
+    #[allow(dead_code)]
     pub fn server_url(&self) -> String {
         format!("http://{}:{}", self.server.host, self.server.port)
     }

@@ -204,6 +204,7 @@ pub async fn complete_upload(
     // Trigger cloud sync if enabled
     let sync_manager = crate::sync::SyncManager::new(state.config.clone());
     if state.config.sync.auto_sync {
+        #[allow(clippy::let_underscore_future)]
         let _ = sync_manager.spawn_sync_task(state.config.sync.sync_delay_seconds);
     }
 

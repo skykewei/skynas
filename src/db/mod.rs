@@ -1,6 +1,5 @@
 use crate::models::*;
 use anyhow::Result;
-use chrono::Utc;
 use rusqlite::{params, Connection};
 use std::path::Path;
 
@@ -94,6 +93,7 @@ impl Database {
         Ok(self.conn.last_insert_rowid())
     }
 
+    #[allow(dead_code)]
     pub fn find_photo_by_hash(&self, file_hash: &str) -> Result<Option<Photo>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, filename, album, file_hash, size_bytes, created_at, uploaded_at, local_path, has_jpeg_variant
@@ -118,6 +118,7 @@ impl Database {
         }
     }
 
+    #[allow(dead_code)]
     pub fn list_photos_by_album(&self, album: &str) -> Result<Vec<Photo>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, filename, album, file_hash, size_bytes, created_at, uploaded_at, local_path, has_jpeg_variant
@@ -206,6 +207,7 @@ impl Database {
     }
 
     // Cleanup old incomplete uploads
+    #[allow(dead_code)]
     pub fn cleanup_old_uploads(&self, hours: i64) -> Result<usize> {
         let rows_affected = self.conn.execute(
             "DELETE FROM upload_chunks

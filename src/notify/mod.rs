@@ -9,6 +9,7 @@ pub fn show_upload_complete(count: usize, album: &str) {
         .show();
 }
 
+#[allow(dead_code)]
 pub fn show_sync_started(album: &str) {
     let _ = Notification::new()
         .summary("开始同步照片")
@@ -18,6 +19,7 @@ pub fn show_sync_started(album: &str) {
         .show();
 }
 
+#[allow(dead_code)]
 pub fn show_cloud_sync_complete(success: bool) {
     if success {
         let _ = Notification::new()

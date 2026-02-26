@@ -3,12 +3,12 @@ use axum::{
     extract::State,
     response::IntoResponse,
 };
-use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use crate::server::AppState;
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub enum WsEvent {
     UploadStarted { filename: String, album: String },
     UploadProgress { filename: String, percent: u8 },

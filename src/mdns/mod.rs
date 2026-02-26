@@ -27,6 +27,7 @@ impl MdnsPublisher {
         }
     }
 
+    #[allow(dead_code)]
     pub fn stop(&mut self) {
         println!("mDNS service stopped");
     }

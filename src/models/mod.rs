@@ -15,6 +15,7 @@ pub struct Photo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct SyncOperation {
     pub id: i64,
     pub started_at: DateTime<Utc>,
@@ -27,6 +28,7 @@ pub struct SyncOperation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct SyncHistory {
     pub id: i64,
     pub photo_id: i64,
@@ -37,6 +39,7 @@ pub struct SyncHistory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub enum SyncStatus {
     Pending,
     Synced,
