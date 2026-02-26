@@ -7,11 +7,7 @@
 
 # SkyNAS Photo Sync
 
-<h3>
-  <span lang="en">Sync photos from iPhone to Mac with ease</span>
-  <br/>
-  <span lang="zh">轻松将 iPhone 照片同步到 Mac</span>
-</h3>
+<h3>Sync photos from iPhone to Mac with ease</h3>
 
 <p>
   <a href="https://github.com/skykewei/skynas/releases/latest">
@@ -32,20 +28,15 @@
 </p>
 
 <p>
-  <a href="#-english">English</a> •
-  <a href="#-中文">中文</a> •
-  <a href="#-installation">Install</a> •
-  <a href="#-usage">Usage</a> •
-  <a href="#-features">Features</a>
+  <strong>🇺🇸 English</strong> •
+  <a href="docs/README.zh.md">🇨🇳 中文</a>
 </p>
 
 </div>
 
 ---
 
-## 🇺🇸 English
-
-### ✨ Features
+## ✨ Features
 
 - **📱 No App Required** - iPhone users access via web browser
 - **📷 QR Code Connection** - Scan to connect instantly
@@ -58,16 +49,18 @@
 - **🔎 mDNS Discovery** - Auto-discover on local network
 - **🔔 Native Notifications** - macOS system notifications
 
-### 📦 Installation
+---
 
-#### Homebrew (Recommended)
+## 📦 Installation
+
+### Homebrew (Recommended)
 
 ```bash
 brew tap skykewei/skynas
 brew install skynas
 ```
 
-#### Binary Download
+### Binary Download
 
 Download from [Releases](https://github.com/skykewei/skynas/releases):
 
@@ -78,7 +71,7 @@ curl -L -o skynas.tar.gz https://github.com/skykewei/skynas/releases/latest/down
 # Apple Silicon
 curl -L -o skynas.tar.gz https://github.com/skykewei/skynas/releases/latest/download/skynas-latest-arm64.tar.gz
 
-# Universal Binary
+# Universal Binary (Recommended)
 curl -L -o skynas.tar.gz https://github.com/skykewei/skynas/releases/latest/download/skynas-latest-universal.tar.gz
 
 # Install
@@ -86,11 +79,13 @@ tar -xzf skynas.tar.gz
 sudo mv skynas-*/skynas /usr/local/bin/
 ```
 
-#### macOS App
+### macOS App
 
 Download `SkyNAS-x.x.x.zip` from [Releases](https://github.com/skykewei/skynas/releases), extract and drag `SkyNAS.app` to `/Applications`.
 
-### 🚀 Quick Start
+---
+
+## 🚀 Quick Start
 
 ```bash
 # Start server (default port 8080)
@@ -109,7 +104,9 @@ skynas status
 skynas stop
 ```
 
-### ⚙️ Configuration
+---
+
+## ⚙️ Configuration
 
 Create `~/.config/skynas/config.toml`:
 
@@ -129,9 +126,12 @@ command = "rclone sync ~/Pictures/iPhoneSync nas:Photos"
 [heic_converter]
 backend = "sips"  # Options: sips, image, libheif
 generate_jpeg = true
+jpeg_quality = 85
 ```
 
-### 🌐 Using with iPhone
+---
+
+## 🌐 Using with iPhone
 
 1. Start SkyNAS on your Mac
 2. Scan the QR code displayed in terminal
@@ -141,101 +141,39 @@ generate_jpeg = true
 
 ---
 
-## 🇨🇳 中文
-
-### ✨ 功能特性
-
-- **📱 无需安装 App** - iPhone 通过浏览器直接访问
-- **📷 二维码连接** - 扫码即刻连接
-- **📁 相册自动整理** - 按相册自动分类
-- **🔄 断点续传** - 大文件传输不怕中断
-- **🔍 重复检测** - SHA256 哈希去重
-- **🖼️ HEIC 转 JPEG** - 多种转换后端支持
-- **☁️ 自动云同步** - 上传后自动同步到 NAS/云端
-- **📊 实时进度** - WebSocket 实时更新
-- **🔎 mDNS 自动发现** - 局域网内自动发现 Mac
-- **🔔 原生通知** - macOS 系统级通知
-
-### 📦 安装方式
-
-#### Homebrew（推荐）
+## 💻 CLI Commands
 
 ```bash
-brew tap skykewei/skynas
-brew install skynas
+skynas [OPTIONS] [COMMAND]
+
+Commands:
+  start      Start the server
+  stop       Stop the running server
+  status     Show server status
+  menu-bar   Run as menu bar app (macOS only)
+  help       Print help
+
+Options:
+  -c, --config <CONFIG>  Configuration file path
+  -p, --port <PORT>      Server port
+  -d, --daemon           Run in daemon mode
+  -h, --help             Print help
 ```
 
-#### 二进制下载
+---
 
-从 [Releases](https://github.com/skykewei/skynas/releases) 下载：
+## 🌐 API Endpoints
 
-```bash
-# Intel Mac
-curl -L -o skynas.tar.gz https://github.com/skykewei/skynas/releases/latest/download/skynas-latest-x86_64.tar.gz
-
-# Apple Silicon M1/M2/M3
-curl -L -o skynas.tar.gz https://github.com/skykewei/skynas/releases/latest/download/skynas-latest-arm64.tar.gz
-
-# 通用二进制（推荐）
-curl -L -o skynas.tar.gz https://github.com/skykewei/skynas/releases/latest/download/skynas-latest-universal.tar.gz
-
-# 安装
-tar -xzf skynas.tar.gz
-sudo mv skynas-*/skynas /usr/local/bin/
-```
-
-#### macOS App
-
-下载 [Releases](https://github.com/skykewei/skynas/releases) 中的 `SkyNAS-x.x.x.zip`，解压后将 `SkyNAS.app` 拖到「应用程序」文件夹。
-
-### 🚀 快速开始
-
-```bash
-# 启动服务（默认端口 8080）
-skynas
-
-# 指定端口
-skynas --port 8081
-
-# 后台运行
-skynas start --background
-
-# 查看状态
-skynas status
-
-# 停止服务
-skynas stop
-```
-
-### ⚙️ 配置说明
-
-创建配置文件 `~/.config/skynas/config.toml`：
-
-```toml
-[server]
-port = 8080
-host = "0.0.0.0"
-
-[storage]
-base_path = "/Users/$USER/Pictures/iPhoneSync"
-
-[sync]
-enabled = true
-auto_sync = true
-command = "rclone sync ~/Pictures/iPhoneSync nas:Photos"
-
-[heic_converter]
-backend = "sips"  # 可选: sips, image, libheif
-generate_jpeg = true
-```
-
-### 🌐 iPhone 使用指南
-
-1. 在 Mac 上启动 SkyNAS
-2. 扫描终端显示的二维码
-3. 在 iPhone Safari 中打开链接
-4. 选择照片并上传
-5. 照片将自动整理到 Mac 的「图片」文件夹
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Web upload interface |
+| `/ws` | GET | WebSocket for real-time updates |
+| `/api/upload` | POST | Simple file upload |
+| `/api/upload/chunked/init` | POST | Initialize chunked upload |
+| `/api/upload/chunked/chunk` | POST | Upload chunk |
+| `/api/upload/chunked/complete/:id` | POST | Complete chunked upload |
+| `/api/upload/chunked/status/:id` | GET | Check upload status |
+| `/api/health` | GET | Health check |
 
 ---
 
@@ -258,18 +196,6 @@ cargo clippy --all-targets --all-features -- -D warnings
 # Format code
 cargo fmt --all
 ```
-
-### API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Web upload interface |
-| `/ws` | GET | WebSocket for real-time updates |
-| `/api/upload` | POST | Simple file upload |
-| `/api/upload/chunked/init` | POST | Initialize chunked upload |
-| `/api/upload/chunked/chunk` | POST | Upload chunk |
-| `/api/upload/chunked/complete/:id` | POST | Complete chunked upload |
-| `/api/health` | GET | Health check |
 
 ---
 
