@@ -234,28 +234,51 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  generate-homebrew-formula:
-    name: Generate Homebrew Formula
-    needs: [create-release, build-universal]
+  update-homebrew-tap:
+    name: Update Homebrew Tap
+    needs: [create-release, build-universal, build-binaries]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: digests
+          pattern: '**/*.sha256'
+          merge-multiple: true
+        continue-on-error: true
 
-      - name: Get universal binary SHA256
-        id: get_sha
+      - name: Calculate SHA256 from release assets
+        id: get_shas
         run: |
           VERSION=${{ needs.create-release.outputs.version }}
-          # Note: In production, this SHA would come from the actual uploaded asset
-          # This is a placeholder that shows the formula structure
-          echo "sha256=PLACEHOLDER_SHA256" >> $GITHUB_OUTPUT
+
+          # Download and calculate SHA for Intel
+          curl -sL "https://github.com/skykewei/skynas/releases/download/${VERSION}/skynas-${VERSION}-x86_64.tar.gz" -o intel.tar.gz || true
+          INTEL_SHA=$(shasum -a 256 intel.tar.gz 2>/dev/null | cut -d' ' -f1) || echo "TBD"
+
+          # Download and calculate SHA for ARM64
+          curl -sL "https://github.com/skykewei/skynas/releases/download/${VERSION}/skynas-${VERSION}-arm64.tar.gz" -o arm64.tar.gz || true
+          ARM_SHA=$(shasum -a 256 arm64.tar.gz 2>/dev/null | cut -d' ' -f1) || echo "TBD"
+
+          echo "intel_sha=$INTEL_SHA" >> $GITHUB_OUTPUT
+          echo "arm_sha=$ARM_SHA" >> $GITHUB_OUTPUT
+
+      - name: Checkout homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: skykewei/homebrew-skynas
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+          path: tap
 
       - name: Generate Homebrew formula
         run: |
           VERSION=${{ needs.create-release.outputs.version }}
           VERSION_NO_V=$(echo $VERSION | sed 's/^v//')
+          INTEL_SHA="${{ steps.get_shas.outputs.intel_sha }}"
+          ARM_SHA="${{ steps.get_shas.outputs.arm_sha }}"
 
-          mkdir -p dist
-          cat > "dist/skynas.rb" << EOF
+          mkdir -p tap/Formula
+          cat > tap/Formula/skynas.rb << EOF
           class Skynas < Formula
             desc "Photo sync tool for iPhone to Mac"
             homepage "https://github.com/skykewei/skynas"
@@ -264,10 +287,10 @@ jobs:
             on_macos do
               if Hardware::CPU.intel?
                 url "https://github.com/skykewei/skynas/releases/download/${VERSION}/skynas-${VERSION}-x86_64.tar.gz"
-                sha256 "PLACEHOLDER_INTEL_SHA256"
+                sha256 "${INTEL_SHA}"
               else
                 url "https://github.com/skykewei/skynas/releases/download/${VERSION}/skynas-${VERSION}-arm64.tar.gz"
-                sha256 "PLACEHOLDER_ARM64_SHA256"
+                sha256 "${ARM_SHA}"
               end
             end
 
@@ -283,9 +306,11 @@ jobs:
           end
           EOF
 
-      - name: Upload formula snippet
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/skynas.rb
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit and push to tap
+        working-directory: tap
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add Formula/skynas.rb
+          git diff --cached --quiet || git commit -m "Update skynas to ${{ needs.create-release.outputs.version }}"
+          git push

@@ -14,17 +14,49 @@ A Rust-based photo sync tool that allows iPhone users to quickly sync photos to 
 - **Real-time Progress**: WebSocket notifications
 - **mDNS Discovery**: Auto-discover Mac on local network
 
+## Installation
+
+### Homebrew (推荐)
+
+```bash
+brew tap skykewei/skynas
+brew install skynas
+```
+
+### GitHub Release
+
+从 [Releases](https://github.com/skykewei/skynas/releases) 下载对应架构的二进制文件：
+
+```bash
+# Intel Mac
+curl -L -o skynas.tar.gz https://github.com/skykewei/skynas/releases/latest/download/skynas-latest-x86_64.tar.gz
+
+# Apple Silicon M1/M2/M3
+curl -L -o skynas.tar.gz https://github.com/skykewei/skynas/releases/latest/download/skynas-latest-arm64.tar.gz
+
+# Universal Binary (两种架构都支持)
+curl -L -o skynas.tar.gz https://github.com/skykewei/skynas/releases/latest/download/skynas-latest-universal.tar.gz
+
+# 解压安装
+tar -xzf skynas.tar.gz
+sudo mv skynas-*/skynas /usr/local/bin/
+```
+
+### macOS App
+
+下载 `SkyNAS-x.x.x.zip`，解压后将 `SkyNAS.app` 拖到 `/Applications` 文件夹。
+
 ## Quick Start
 
 ```bash
 # Run the server
-cargo run
+skynas
 
 # Or with custom port
-cargo run -- --port 8081
+skynas --port 8081
 
 # Start in background
-cargo run -- start --background
+skynas start --background
 ```
 
 Then scan the QR code with your iPhone camera and open the link.
