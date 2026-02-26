@@ -1,6 +1,6 @@
 use crate::models::*;
 use anyhow::Result;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::path::Path;
 
 pub struct Database {
@@ -146,8 +146,15 @@ impl Database {
     }
 
     // Chunked upload operations
-    pub fn create_upload_session(&self, upload_id: &str, filename: &str, album: &str,
-                                 total_size: i64, total_chunks: i32, temp_path: &str) -> Result<()> {
+    pub fn create_upload_session(
+        &self,
+        upload_id: &str,
+        filename: &str,
+        album: &str,
+        total_size: i64,
+        total_chunks: i32,
+        temp_path: &str,
+    ) -> Result<()> {
         self.conn.execute(
             "INSERT INTO upload_chunks (upload_id, filename, album, total_size, chunk_index, total_chunks, temp_path)
              VALUES (?1, ?2, ?3, ?4, 0, ?5, ?6)
@@ -162,8 +169,13 @@ impl Database {
         Ok(())
     }
 
-    pub fn update_upload_progress(&self, upload_id: &str, chunk_index: i32,
-                                   received_bytes: i64, completed: bool) -> Result<()> {
+    pub fn update_upload_progress(
+        &self,
+        upload_id: &str,
+        chunk_index: i32,
+        received_bytes: i64,
+        completed: bool,
+    ) -> Result<()> {
         self.conn.execute(
             "UPDATE upload_chunks SET chunk_index = ?1, received_bytes = ?2, completed = ?3
              WHERE upload_id = ?4",
@@ -176,7 +188,7 @@ impl Database {
         let mut stmt = self.conn.prepare(
             "SELECT upload_id, filename, album, total_size, chunk_index, total_chunks,
                     received_bytes, completed, created_at, temp_path
-             FROM upload_chunks WHERE upload_id = ?1"
+             FROM upload_chunks WHERE upload_id = ?1",
         )?;
         let mut rows = stmt.query(params![upload_id])?;
 

@@ -33,37 +33,57 @@ impl HeicConverter {
             "libheif" => self.convert_with_libheif(input_path, &output_path),
             "sips" => self.convert_with_sips(input_path, &output_path),
             _ => {
-                eprintln!("Unknown converter backend: {}, falling back to image", self.config.backend);
+                eprintln!(
+                    "Unknown converter backend: {}, falling back to image",
+                    self.config.backend
+                );
                 self.convert_with_image(input_path, &output_path)
             }
         }
     }
 
-    fn convert_with_image(&self, _input: &Path, _output: &Path) -> anyhow::Result<Option<std::path::PathBuf>> {
+    fn convert_with_image(
+        &self,
+        _input: &Path,
+        _output: &Path,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         // Note: image crate has limited HEIC support
         // This is a placeholder - in production, use libheif-rs
-        eprintln!("Image crate HEIC support is limited. Consider using 'libheif' or 'sips' backend.");
+        eprintln!(
+            "Image crate HEIC support is limited. Consider using 'libheif' or 'sips' backend."
+        );
 
         // For now, just return None to indicate no conversion
         // In a real implementation, you'd use libheif-rs crate
         Ok(None)
     }
 
-    fn convert_with_libheif(&self, _input: &Path, _output: &Path) -> anyhow::Result<Option<std::path::PathBuf>> {
+    fn convert_with_libheif(
+        &self,
+        _input: &Path,
+        _output: &Path,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         // This would require libheif-sys or libheif-rs
         // Placeholder implementation
         eprintln!("libheif backend not yet implemented");
         Ok(None)
     }
 
-    fn convert_with_sips(&self, input: &Path, output: &Path) -> anyhow::Result<Option<std::path::PathBuf>> {
+    fn convert_with_sips(
+        &self,
+        input: &Path,
+        output: &Path,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         let quality = self.config.jpeg_quality;
 
         let status = Command::new("sips")
             .args([
-                "-s", "format jpeg",
-                "-s", &format!("formatOptions {}", quality),
-                "-o", output.to_str().unwrap(),
+                "-s",
+                "format jpeg",
+                "-s",
+                &format!("formatOptions {}", quality),
+                "-o",
+                output.to_str().unwrap(),
                 input.to_str().unwrap(),
             ])
             .status()?;

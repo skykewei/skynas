@@ -1,7 +1,7 @@
 use crate::config::Config;
 use std::process::Stdio;
 use tokio::process::Command;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 pub struct SyncManager {
     config: Config,

@@ -1,12 +1,12 @@
 use crate::config::Config;
 use crate::db::Database;
-use crate::websocket::{create_event_channel, ws_handler, EventSender};
+use crate::websocket::{EventSender, create_event_channel, ws_handler};
 use axum::{
+    Router,
     extract::{Multipart, State},
     http::StatusCode,
     response::{Html, IntoResponse, Json},
     routing::{get, post},
-    Router,
 };
 use sha2::Digest;
 use std::sync::Arc;
@@ -39,8 +39,14 @@ pub async fn run_server(config: Config, db: Database) -> anyhow::Result<()> {
         .route("/api/upload", post(upload_handler))
         .route("/api/upload/chunked/init", post(init_upload))
         .route("/api/upload/chunked/chunk", post(upload_chunk))
-        .route("/api/upload/chunked/complete/:upload_id", post(complete_upload))
-        .route("/api/upload/chunked/status/:upload_id", get(get_upload_status))
+        .route(
+            "/api/upload/chunked/complete/:upload_id",
+            post(complete_upload),
+        )
+        .route(
+            "/api/upload/chunked/status/:upload_id",
+            get(get_upload_status),
+        )
         .route("/api/health", get(health_handler))
         .nest_service("/static", ServeDir::new("src/server/static"))
         .layer(CorsLayer::permissive())
@@ -72,7 +78,11 @@ async fn upload_handler(
     let mut album = String::from("未分类");
     let mut file_data: Option<(String, Vec<u8>)> = None;
 
-    while let Some(field) = multipart.next_field().await.map_err(|_| StatusCode::BAD_REQUEST)? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?
+    {
         let name = field.name().unwrap_or("").to_string();
 
         match name.as_str() {
@@ -91,10 +101,14 @@ async fn upload_handler(
     if let Some((filename, data)) = file_data {
         // Save file
         let album_path = state.config.storage.base_path.join(&album);
-        tokio::fs::create_dir_all(&album_path).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        tokio::fs::create_dir_all(&album_path)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
         let file_path = album_path.join(&filename);
-        tokio::fs::write(&file_path, &data).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        tokio::fs::write(&file_path, &data)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
         // Record in database
         let file_hash = format!("{:x}", sha2::Sha256::digest(&data));

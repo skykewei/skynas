@@ -41,7 +41,10 @@ pub async fn init_upload(
     Json(req): Json<InitUploadRequest>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let upload_id = Uuid::new_v4().to_string();
-    let temp_path = state.config.storage.base_path
+    let temp_path = state
+        .config
+        .storage
+        .base_path
         .join(".temp")
         .join(&upload_id);
 
@@ -83,7 +86,11 @@ pub async fn upload_chunk(
 
     // Receive chunk data
     let mut chunk_data: Option<Vec<u8>> = None;
-    while let Some(field) = multipart.next_field().await.map_err(|_| StatusCode::BAD_REQUEST)? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?
+    {
         if field.name() == Some("chunk") {
             let data = field.bytes().await.map_err(|_| StatusCode::BAD_REQUEST)?;
             chunk_data = Some(data.to_vec());
@@ -93,8 +100,8 @@ pub async fn upload_chunk(
     let chunk_data = chunk_data.ok_or(StatusCode::BAD_REQUEST)?;
 
     // Save chunk to temp file
-    let chunk_path = std::path::Path::new(&session.temp_path)
-        .join(format!("chunk_{}", query.chunk_index));
+    let chunk_path =
+        std::path::Path::new(&session.temp_path).join(format!("chunk_{}", query.chunk_index));
 
     let mut file = tokio::fs::File::create(&chunk_path)
         .await
@@ -111,8 +118,13 @@ pub async fn upload_chunk(
     {
         let db = state.db.lock().await;
         let received_bytes = (received_chunks as i64) * (chunk_data.len() as i64);
-        db.update_upload_progress(&query.upload_id, query.chunk_index, received_bytes, completed)
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        db.update_upload_progress(
+            &query.upload_id,
+            query.chunk_index,
+            received_bytes,
+            completed,
+        )
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
 
     Ok(Json(UploadStatus {

@@ -10,11 +10,11 @@ mod server;
 mod sync;
 mod websocket;
 
-use cli::{Cli, Commands};
 use clap::Parser;
+use cli::{Cli, Commands};
 use config::Config;
 use db::Database;
-use qr::{print_server_info, get_best_host};
+use qr::{get_best_host, print_server_info};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

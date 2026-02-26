@@ -1,5 +1,5 @@
-use qrcode::render::unicode;
 use qrcode::QrCode;
+use qrcode::render::unicode;
 
 pub fn generate_qr_string(data: &str) -> anyhow::Result<String> {
     let code = QrCode::new(data)?;
