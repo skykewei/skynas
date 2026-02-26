@@ -11,20 +11,19 @@
 
 <p>
   <a href="https://github.com/skykewei/skynas/releases/latest">
-    <img src="https://img.shields.io/github/v/release/skykewei/skynas?style=for-the-badge&logo=github&color=blue" alt="Release">
+    <img src="https://img.shields.io/badge/Release-v0.1.0-blue?style=for-the-badge&logo=github" alt="Release">
   </a>
   <a href="https://github.com/skykewei/skynas/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/skykewei/skynas/ci.yml?style=for-the-badge&logo=github-actions&logoColor=white&label=CI" alt="CI">
+    <img src="https://github.com/skykewei/skynas/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
   <a href="../LICENSE">
-    <img src="https://img.shields.io/github/license/skykewei/skynas?style=for-the-badge&color=green" alt="License">
+    <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
   </a>
 </p>
 
 <p>
   <img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust">
-  <img src="https://img.shields.io/github/languages/code-size/skykewei/skynas?style=for-the-badge&color=orange" alt="Code Size">
-  <img src="https://img.shields.io/badge/platform-macOS-lightgrey?style=for-the-badge&logo=apple" alt="Platform">
+  <img src="https://img.shields.io/badge/macOS-平台-lightgrey?style=for-the-badge&logo=apple" alt="Platform">
 </p>
 
 <p>
