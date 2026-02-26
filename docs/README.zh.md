@@ -17,7 +17,7 @@
     <img src="https://github.com/skykewei/skynas/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
   <a href="../LICENSE">
-    <img src="https://img.shields.io/github/license/skykewei/skynas?style=for-the-badge&color=green" alt="License">
+    <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
   </a>
   <a href="https://github.com/skykewei/skynas/stargazers">
     <img src="https://img.shields.io/github/stars/skykewei/skynas?style=for-the-badge&color=yellow" alt="Stars">
@@ -26,8 +26,8 @@
 
 <p>
   <img src="https://img.shields.io/github/downloads/skykewei/skynas/total?style=for-the-badge&color=purple" alt="Downloads">
-  <img src="https://img.shields.io/github/languages/code-size/skykewei/skynas?style=for-the-badge&color=orange" alt="Code Size">
-  <img src="https://img.shields.io/github/last-commit/skykewei/skynas?style=for-the-badge&color=red" alt="Last Commit">
+  <img src="https://img.shields.io/tokei/lines/github/skykewei/skynas?style=for-the-badge&color=orange" alt="代码行数">
+  <img src="https://img.shields.io/github/last-commit/skykewei/skynas?style=for-the-badge&color=red" alt="最后提交">
 </p>
 
 <p>
