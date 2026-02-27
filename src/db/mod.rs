@@ -69,14 +69,56 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_upload_chunks_completed ON upload_chunks(upload_id, completed);
             "#
         )?;
+
+        // 尝试添加新列（如果不存在则忽略错误）
+        let _ = self.conn.execute(
+            "ALTER TABLE photos ADD COLUMN thumbnail_path TEXT",
+            [],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE photos ADD COLUMN width INTEGER",
+            [],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE photos ADD COLUMN height INTEGER",
+            [],
+        );
+
+        // 新增 upload_tasks 表
+        self.conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS upload_tasks (
+                id TEXT PRIMARY KEY,
+                filename TEXT NOT NULL,
+                album TEXT NOT NULL,
+                total_bytes INTEGER NOT NULL DEFAULT 0,
+                received_bytes INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                cancelled INTEGER DEFAULT 0
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_upload_tasks_status ON upload_tasks(status);
+
+            CREATE TABLE IF NOT EXISTS admin_config (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                jwt_secret TEXT NOT NULL,
+                admin_password_hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            "#
+        )?;
+
         Ok(())
     }
 
     // Photo operations
     pub fn insert_photo(&self, photo: &Photo) -> Result<i64> {
         self.conn.execute(
-            "INSERT INTO photos (filename, album, file_hash, size_bytes, created_at, local_path, has_jpeg_variant)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "INSERT INTO photos (filename, album, file_hash, size_bytes, created_at, local_path, has_jpeg_variant, thumbnail_path, width, height)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
              ON CONFLICT(file_hash) DO UPDATE SET
                  uploaded_at = excluded.uploaded_at
              RETURNING id",
@@ -88,6 +130,9 @@ impl Database {
                 photo.created_at,
                 photo.local_path,
                 photo.has_jpeg_variant,
+                photo.thumbnail_path,
+                photo.width,
+                photo.height,
             ],
         )?;
         Ok(self.conn.last_insert_rowid())
@@ -96,7 +141,7 @@ impl Database {
     #[allow(dead_code)]
     pub fn find_photo_by_hash(&self, file_hash: &str) -> Result<Option<Photo>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, filename, album, file_hash, size_bytes, created_at, uploaded_at, local_path, has_jpeg_variant
+            "SELECT id, filename, album, file_hash, size_bytes, created_at, uploaded_at, local_path, has_jpeg_variant, thumbnail_path, width, height
              FROM photos WHERE file_hash = ?1"
         )?;
         let mut rows = stmt.query(params![file_hash])?;
@@ -112,9 +157,9 @@ impl Database {
                 uploaded_at: row.get(6)?,
                 local_path: row.get(7)?,
                 has_jpeg_variant: row.get(8)?,
-                thumbnail_path: None,
-                width: None,
-                height: None,
+                thumbnail_path: row.get(9).ok(),
+                width: row.get(10).ok(),
+                height: row.get(11).ok(),
             }))
         } else {
             Ok(None)
@@ -124,7 +169,7 @@ impl Database {
     #[allow(dead_code)]
     pub fn list_photos_by_album(&self, album: &str) -> Result<Vec<Photo>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, filename, album, file_hash, size_bytes, created_at, uploaded_at, local_path, has_jpeg_variant
+            "SELECT id, filename, album, file_hash, size_bytes, created_at, uploaded_at, local_path, has_jpeg_variant, thumbnail_path, width, height
              FROM photos WHERE album = ?1 ORDER BY uploaded_at DESC"
         )?;
         let rows = stmt.query_map(params![album], |row| {
@@ -138,9 +183,9 @@ impl Database {
                 uploaded_at: row.get(6)?,
                 local_path: row.get(7)?,
                 has_jpeg_variant: row.get(8)?,
-                thumbnail_path: None,
-                width: None,
-                height: None,
+                thumbnail_path: row.get(9).ok(),
+                width: row.get(10).ok(),
+                height: row.get(11).ok(),
             })
         })?;
 
@@ -234,5 +279,132 @@ impl Database {
             params![-hours],
         )?;
         Ok(rows_affected)
+    }
+
+    // Upload Task operations
+    pub fn create_upload_task(&self, task: &UploadTask) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO upload_tasks (id, filename, album, total_bytes, received_bytes, status, created_at, updated_at, cancelled)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+             ON CONFLICT(id) DO UPDATE SET
+                 received_bytes = excluded.received_bytes,
+                 status = excluded.status,
+                 updated_at = excluded.updated_at,
+                 cancelled = excluded.cancelled",
+            params![
+                task.id, task.filename, task.album, task.total_bytes,
+                task.received_bytes, task.status.as_str(), task.created_at,
+                task.updated_at, task.cancelled as i32
+            ],
+        )?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn get_upload_task(&self, id: &str) -> Result<Option<UploadTask>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, filename, album, total_bytes, received_bytes, status, created_at, updated_at, cancelled
+             FROM upload_tasks WHERE id = ?1"
+        )?;
+        let mut rows = stmt.query(params![id])?;
+
+        if let Some(row) = rows.next()? {
+            Ok(Some(UploadTask {
+                id: row.get(0)?,
+                filename: row.get(1)?,
+                album: row.get(2)?,
+                total_bytes: row.get(3)?,
+                received_bytes: row.get(4)?,
+                status: match row.get::<_, String>(5)?.as_str() {
+                    "uploading" => TaskStatus::Uploading,
+                    "completed" => TaskStatus::Completed,
+                    "cancelled" => TaskStatus::Cancelled,
+                    "error" => TaskStatus::Error,
+                    _ => TaskStatus::Pending,
+                },
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+                cancelled: row.get::<_, i32>(8)? != 0,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn list_active_uploads(&self) -> Result<Vec<UploadTask>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, filename, album, total_bytes, received_bytes, status, created_at, updated_at, cancelled
+             FROM upload_tasks WHERE status IN ('pending', 'uploading') ORDER BY created_at DESC"
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok(UploadTask {
+                id: row.get(0)?,
+                filename: row.get(1)?,
+                album: row.get(2)?,
+                total_bytes: row.get(3)?,
+                received_bytes: row.get(4)?,
+                status: match row.get::<_, String>(5)?.as_str() {
+                    "uploading" => TaskStatus::Uploading,
+                    "completed" => TaskStatus::Completed,
+                    "cancelled" => TaskStatus::Cancelled,
+                    "error" => TaskStatus::Error,
+                    _ => TaskStatus::Pending,
+                },
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+                cancelled: row.get::<_, i32>(8)? != 0,
+            })
+        })?;
+
+        let mut tasks = Vec::new();
+        for row in rows {
+            tasks.push(row?);
+        }
+        Ok(tasks)
+    }
+
+    #[allow(dead_code)]
+    pub fn cleanup_incomplete_uploads(&self) -> Result<usize> {
+        let rows_affected = self.conn.execute(
+            "DELETE FROM upload_tasks WHERE status IN ('pending', 'uploading', 'error')",
+            [],
+        )?;
+        Ok(rows_affected)
+    }
+
+    // Admin Config operations
+    #[allow(dead_code)]
+    pub fn get_or_create_admin_config(&self, default_secret: &str) -> Result<AdminConfig> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, jwt_secret, admin_password_hash, created_at, updated_at FROM admin_config WHERE id = 1"
+        )?;
+        let mut rows = stmt.query([])?;
+
+        if let Some(row) = rows.next()? {
+            Ok(AdminConfig {
+                id: row.get(0)?,
+                jwt_secret: row.get(1)?,
+                admin_password_hash: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+            })
+        } else {
+            // 创建默认配置
+            let default_hash = bcrypt::hash("admin", bcrypt::DEFAULT_COST).unwrap_or_default();
+            self.conn.execute(
+                "INSERT INTO admin_config (id, jwt_secret, admin_password_hash) VALUES (1, ?1, ?2)",
+                params![default_secret, default_hash],
+            )?;
+
+            Ok(AdminConfig {
+                id: 1,
+                jwt_secret: default_secret.to_string(),
+                admin_password_hash: default_hash,
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+            })
+        }
     }
 }
