@@ -116,7 +116,7 @@ impl Database {
 
     // Photo operations
     pub fn insert_photo(&self, photo: &Photo) -> Result<i64> {
-        self.conn.execute(
+        let id: i64 = self.conn.query_row(
             "INSERT INTO photos (filename, album, file_hash, size_bytes, created_at, local_path, has_jpeg_variant, thumbnail_path, width, height)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
              ON CONFLICT(file_hash) DO UPDATE SET
@@ -134,8 +134,9 @@ impl Database {
                 photo.width,
                 photo.height,
             ],
+            |row| row.get(0),
         )?;
-        Ok(self.conn.last_insert_rowid())
+        Ok(id)
     }
 
     #[allow(dead_code)]
@@ -272,11 +273,14 @@ impl Database {
     // Cleanup old incomplete uploads
     #[allow(dead_code)]
     pub fn cleanup_old_uploads(&self, hours: i64) -> Result<usize> {
+        if hours <= 0 {
+            return Ok(0);
+        }
         let rows_affected = self.conn.execute(
             "DELETE FROM upload_chunks
              WHERE completed = FALSE
-             AND created_at < datetime('now', ?1 || ' hours')",
-            params![-hours],
+             AND created_at < datetime('now', '-' || ?1 || ' hours')",
+            params![hours],
         )?;
         Ok(rows_affected)
     }
@@ -392,7 +396,8 @@ impl Database {
             })
         } else {
             // 创建默认配置
-            let default_hash = bcrypt::hash("admin", bcrypt::DEFAULT_COST).unwrap_or_default();
+            let default_hash = bcrypt::hash("admin", bcrypt::DEFAULT_COST)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
             self.conn.execute(
                 "INSERT INTO admin_config (id, jwt_secret, admin_password_hash) VALUES (1, ?1, ?2)",
                 params![default_secret, default_hash],
