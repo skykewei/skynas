@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 # Async runtim/e and web framework
 tokio = { version = "1.35", features = ["full"] }
+tokio-util = "0.7"
 axum = { version = "0.7", features = ["multipart", "ws"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
@@ -17,6 +18,10 @@ rusqlite = { version = "0.30", features = ["bundled", "chrono"] }
 config = "0.14"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
+
+# JWT Authentication
+jsonwebtoken = "9"
+bcrypt = "0.15"
 
 # QR Code generation
 qrcode = "0.14"
