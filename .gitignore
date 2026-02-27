@@ -20,6 +20,9 @@ Thumbs.db
 *.db-journal
 .temp/
 uploads/
+storage/
+server.log
+*.log
 
 # Config (user-specific)
 config.toml
