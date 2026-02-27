@@ -18,7 +18,20 @@ use qr::{get_best_host, print_server_info};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
+    // Initialize tracing with env filter for configurable log levels
+    // Use RUST_LOG env var, default to "info" for production
+    // Examples:
+    //   RUST_LOG=debug cargo run
+    //   RUST_LOG=skynas=trace,hyper=error cargo run
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_line_number(true)
+        .init();
 
     let cli = Cli::parse();
 
