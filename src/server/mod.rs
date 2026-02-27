@@ -269,6 +269,9 @@ async fn upload_handler(
             uploaded_at: chrono::Utc::now(),
             local_path: file_path.to_string_lossy().to_string(),
             has_jpeg_variant: false,
+            thumbnail_path: None,
+            width: None,
+            height: None,
         };
 
         debug!(upload_id = %upload_id, "Saving photo to database");

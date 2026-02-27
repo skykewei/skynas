@@ -112,6 +112,9 @@ impl Database {
                 uploaded_at: row.get(6)?,
                 local_path: row.get(7)?,
                 has_jpeg_variant: row.get(8)?,
+                thumbnail_path: None,
+                width: None,
+                height: None,
             }))
         } else {
             Ok(None)
@@ -135,6 +138,9 @@ impl Database {
                 uploaded_at: row.get(6)?,
                 local_path: row.get(7)?,
                 has_jpeg_variant: row.get(8)?,
+                thumbnail_path: None,
+                width: None,
+                height: None,
             })
         })?;
 

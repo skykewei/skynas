@@ -460,6 +460,9 @@ pub async fn complete_upload(
             uploaded_at: chrono::Utc::now(),
             local_path: final_path.to_string_lossy().to_string(),
             has_jpeg_variant: has_jpeg,
+            thumbnail_path: None,
+            width: None,
+            height: None,
         };
         db.insert_photo(&photo)
             .map_err(|e| {

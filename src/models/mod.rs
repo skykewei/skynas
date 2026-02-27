@@ -12,6 +12,9 @@ pub struct Photo {
     pub uploaded_at: DateTime<Utc>,
     pub local_path: String,
     pub has_jpeg_variant: bool,
+    pub thumbnail_path: Option<String>,  // 缩略图路径
+    pub width: Option<i32>,              // 图片宽度
+    pub height: Option<i32>,             // 图片高度
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,4 +61,48 @@ pub struct UploadChunk {
     pub completed: bool,
     pub created_at: DateTime<Utc>,
     pub temp_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UploadTask {
+    pub id: String,
+    pub filename: String,
+    pub album: String,
+    pub total_bytes: i64,
+    pub received_bytes: i64,
+    pub status: TaskStatus,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub cancelled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskStatus {
+    Pending,
+    Uploading,
+    Completed,
+    Cancelled,
+    Error,
+}
+
+impl TaskStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TaskStatus::Pending => "pending",
+            TaskStatus::Uploading => "uploading",
+            TaskStatus::Completed => "completed",
+            TaskStatus::Cancelled => "cancelled",
+            TaskStatus::Error => "error",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdminConfig {
+    pub id: i64,
+    pub jwt_secret: String,
+    pub admin_password_hash: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
