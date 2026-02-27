@@ -7,6 +7,7 @@ mod models;
 mod notify;
 mod qr;
 mod server;
+mod startup;
 mod sync;
 mod websocket;
 
@@ -15,6 +16,7 @@ use cli::{Cli, Commands};
 use config::Config;
 use db::Database;
 use qr::{get_best_host, print_server_info};
+use startup::print_startup_info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -78,6 +80,7 @@ async fn run_server(port_override: Option<u16>) -> anyhow::Result<()> {
 
     let host = get_best_host(&config.server.host);
     print_server_info(&host, config.server.port);
+    print_startup_info(&config);
 
     // Start mDNS in a separate thread if enabled
     if config.features.mdns_enabled {
