@@ -21,6 +21,9 @@ use uuid::Uuid;
 mod upload;
 use upload::{complete_upload, get_upload_status, init_upload, upload_chunk};
 
+mod photos;
+use photos::{get_photo, get_thumbnail, list_albums, list_photos};
+
 #[derive(Clone)]
 pub struct AppState {
     pub config: Config,
@@ -52,6 +55,10 @@ pub async fn run_server(config: Config, db: Database) -> anyhow::Result<()> {
             get(get_upload_status),
         )
         .route("/api/health", get(health_handler))
+        .route("/api/photos", get(list_photos))
+        .route("/api/albums", get(list_albums))
+        .route("/api/photos/:id", get(get_photo))
+        .route("/api/photos/:id/thumbnail", get(get_thumbnail))
         .nest_service("/static", ServeDir::new("src/server/static"))
         .layer(CorsLayer::permissive())
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100MB limit for streaming

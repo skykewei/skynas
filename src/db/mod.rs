@@ -197,6 +197,146 @@ impl Database {
         Ok(photos)
     }
 
+    /// List photos with pagination and optional album filter
+    pub fn list_photos(
+        &self,
+        album: Option<&str>,
+        limit: i32,
+        offset: i64,
+    ) -> Result<(Vec<Photo>, i64)> {
+        let photos = if let Some(album) = album {
+            let mut stmt = self.conn.prepare(
+                "SELECT id, filename, album, file_hash, size_bytes, created_at, uploaded_at, local_path, has_jpeg_variant, thumbnail_path, width, height
+                 FROM photos WHERE album = ?1 ORDER BY uploaded_at DESC LIMIT ?2 OFFSET ?3"
+            )?;
+
+            let rows = stmt.query_map(params![album, limit, offset], |row| {
+                Ok(Photo {
+                    id: row.get(0)?,
+                    filename: row.get(1)?,
+                    album: row.get(2)?,
+                    file_hash: row.get(3)?,
+                    size_bytes: row.get(4)?,
+                    created_at: row.get(5)?,
+                    uploaded_at: row.get(6)?,
+                    local_path: row.get(7)?,
+                    has_jpeg_variant: row.get(8)?,
+                    thumbnail_path: row.get(9).ok(),
+                    width: row.get(10).ok(),
+                    height: row.get(11).ok(),
+                })
+            })?;
+
+            let mut items = Vec::new();
+            for row in rows {
+                items.push(row?);
+            }
+            items
+        } else {
+            let mut stmt = self.conn.prepare(
+                "SELECT id, filename, album, file_hash, size_bytes, created_at, uploaded_at, local_path, has_jpeg_variant, thumbnail_path, width, height
+                 FROM photos ORDER BY uploaded_at DESC LIMIT ?1 OFFSET ?2"
+            )?;
+
+            let rows = stmt.query_map(params![limit, offset], |row| {
+                Ok(Photo {
+                    id: row.get(0)?,
+                    filename: row.get(1)?,
+                    album: row.get(2)?,
+                    file_hash: row.get(3)?,
+                    size_bytes: row.get(4)?,
+                    created_at: row.get(5)?,
+                    uploaded_at: row.get(6)?,
+                    local_path: row.get(7)?,
+                    has_jpeg_variant: row.get(8)?,
+                    thumbnail_path: row.get(9).ok(),
+                    width: row.get(10).ok(),
+                    height: row.get(11).ok(),
+                })
+            })?;
+
+            let mut items = Vec::new();
+            for row in rows {
+                items.push(row?);
+            }
+            items
+        };
+
+        // Get total count
+        let total: i64 = if let Some(album) = album {
+            self.conn.query_row(
+                "SELECT COUNT(*) FROM photos WHERE album = ?1",
+                [album],
+                |row| row.get(0),
+            )?
+        } else {
+            self.conn.query_row(
+                "SELECT COUNT(*) FROM photos",
+                [],
+                |row| row.get(0),
+            )?
+        };
+
+        Ok((photos, total))
+    }
+
+    /// Get a single photo by ID
+    pub fn get_photo(&self, id: i64) -> Result<Option<Photo>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, filename, album, file_hash, size_bytes, created_at, uploaded_at, local_path, has_jpeg_variant, thumbnail_path, width, height
+             FROM photos WHERE id = ?1"
+        )?;
+
+        let mut rows = stmt.query(params![id])?;
+
+        if let Some(row) = rows.next()? {
+            Ok(Some(Photo {
+                id: row.get(0)?,
+                filename: row.get(1)?,
+                album: row.get(2)?,
+                file_hash: row.get(3)?,
+                size_bytes: row.get(4)?,
+                created_at: row.get(5)?,
+                uploaded_at: row.get(6)?,
+                local_path: row.get(7)?,
+                has_jpeg_variant: row.get(8)?,
+                thumbnail_path: row.get(9).ok(),
+                width: row.get(10).ok(),
+                height: row.get(11).ok(),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get thumbnail path for a photo
+    pub fn get_thumbnail_path(&self, id: i64) -> Result<Option<String>> {
+        let path: Option<String> = self.conn.query_row(
+            "SELECT thumbnail_path FROM photos WHERE id = ?1",
+            [id],
+            |row| row.get(0),
+        ).ok().flatten();
+
+        Ok(path)
+    }
+
+    /// List all albums with photo counts
+    pub fn list_albums(&self) -> Result<Vec<(String, i64)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT album, COUNT(*) as count FROM photos GROUP BY album ORDER BY count DESC"
+        )?;
+
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })?;
+
+        let mut albums = Vec::new();
+        for row in rows {
+            albums.push(row?);
+        }
+        Ok(albums)
+    }
+
     // Chunked upload operations
     pub fn create_upload_session(
         &self,
