@@ -6,13 +6,15 @@ use axum::{
     extract::{DefaultBodyLimit, Multipart, State},
     http::StatusCode,
     response::{Html, IntoResponse, Json},
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use sha2::Digest;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use tracing::{debug, error, info, instrument, warn};
@@ -20,6 +22,11 @@ use uuid::Uuid;
 
 mod upload;
 use upload::{complete_upload, get_upload_status, init_upload, upload_chunk};
+
+mod uploads;
+use uploads::{
+    cancel_all_uploads, cancel_upload, cleanup_incomplete_uploads, list_active_uploads,
+};
 
 mod photos;
 use photos::{get_photo, get_thumbnail, list_albums, list_photos};
@@ -29,6 +36,7 @@ pub struct AppState {
     pub config: Config,
     pub db: Arc<Mutex<Database>>,
     pub event_sender: EventSender,
+    pub active_uploads: Arc<Mutex<HashMap<String, CancellationToken>>>,
 }
 
 pub async fn run_server(config: Config, db: Database) -> anyhow::Result<()> {
@@ -38,6 +46,7 @@ pub async fn run_server(config: Config, db: Database) -> anyhow::Result<()> {
         config: config.clone(),
         db: Arc::new(Mutex::new(db)),
         event_sender,
+        active_uploads: Arc::new(Mutex::new(HashMap::new())),
     };
 
     let app = Router::new()
@@ -59,6 +68,10 @@ pub async fn run_server(config: Config, db: Database) -> anyhow::Result<()> {
         .route("/api/albums", get(list_albums))
         .route("/api/photos/:id", get(get_photo))
         .route("/api/photos/:id/thumbnail", get(get_thumbnail))
+        .route("/api/uploads/active", get(list_active_uploads))
+        .route("/api/uploads/:id/cancel", post(cancel_upload))
+        .route("/api/uploads/cancel-all", post(cancel_all_uploads))
+        .route("/api/uploads/cleanup-incomplete", delete(cleanup_incomplete_uploads))
         .nest_service("/static", ServeDir::new("src/server/static"))
         .layer(CorsLayer::permissive())
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100MB limit for streaming
@@ -88,6 +101,9 @@ async fn upload_handler(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, StatusCode> {
+    use crate::models::{TaskStatus, UploadTask};
+    use tokio_util::sync::CancellationToken;
+
     let start = Instant::now();
     let upload_id = Uuid::new_v4().to_string();
 
@@ -95,6 +111,14 @@ async fn upload_handler(
     let mut file_info: Option<(String, String, u64)> = None; // (filename, temp_path, size)
 
     info!(upload_id = %upload_id, "Starting streaming upload");
+
+    // Create cancellation token for this upload
+    let cancel_token = CancellationToken::new();
+    state
+        .active_uploads
+        .lock()
+        .await
+        .insert(upload_id.clone(), cancel_token.clone());
 
     // Create temp directory for streaming uploads
     let temp_dir = state
@@ -168,8 +192,36 @@ async fn upload_handler(
         }
     }
 
+    // Check if cancelled during upload
+    if cancel_token.is_cancelled() {
+        let _ = tokio::fs::remove_dir_all(&temp_dir).await;
+        state.active_uploads.lock().await.remove(&upload_id);
+        warn!(upload_id = %upload_id, "Streaming upload cancelled");
+        return Err(StatusCode::REQUEST_TIMEOUT);
+    }
+
     if let Some((filename, temp_path, size)) = file_info {
         let size_i64 = size as i64;
+
+        // Create upload task record
+        let task = UploadTask {
+            id: upload_id.clone(),
+            filename: filename.clone(),
+            album: album.clone(),
+            total_bytes: size_i64,
+            received_bytes: size_i64,
+            status: TaskStatus::Uploading,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            cancelled: false,
+        };
+
+        {
+            let db = state.db.lock().await;
+            if let Err(e) = db.create_upload_task(&task) {
+                error!(upload_id = %upload_id, error = %e, "Failed to create upload task");
+            }
+        }
 
         info!(
             upload_id = %upload_id,
@@ -314,6 +366,19 @@ async fn upload_handler(
             size: size_i64,
         });
 
+        // Update task status to completed
+        {
+            let db = state.db.lock().await;
+            if let Ok(Some(mut task)) = db.get_upload_task(&upload_id) {
+                task.status = TaskStatus::Completed;
+                task.updated_at = chrono::Utc::now();
+                let _ = db.create_upload_task(&task);
+            }
+        }
+
+        // Remove from active uploads
+        state.active_uploads.lock().await.remove(&upload_id);
+
         let elapsed = start.elapsed().as_millis();
         info!(
             upload_id = %upload_id,
@@ -332,6 +397,8 @@ async fn upload_handler(
             "size": size_i64
         })))
     } else {
+        // Clean up active uploads on error
+        state.active_uploads.lock().await.remove(&upload_id);
         warn!(upload_id = %upload_id, "No file data in upload request");
         Err(StatusCode::BAD_REQUEST)
     }

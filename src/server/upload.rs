@@ -1,3 +1,4 @@
+use crate::models::{TaskStatus, UploadTask};
 use crate::server::AppState;
 use crate::websocket::WsEvent;
 use axum::{
@@ -9,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::time::Instant;
 use tokio::io::AsyncWriteExt;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
@@ -55,6 +57,35 @@ pub async fn init_upload(
         total_chunks = req.total_chunks,
         "Upload session initialized"
     );
+
+    // Create cancellation token and store it
+    let cancel_token = CancellationToken::new();
+    state
+        .active_uploads
+        .lock()
+        .await
+        .insert(upload_id.clone(), cancel_token.clone());
+
+    // Create upload task record
+    let task = UploadTask {
+        id: upload_id.clone(),
+        filename: req.filename.clone(),
+        album: req.album.clone(),
+        total_bytes: req.total_size,
+        received_bytes: 0,
+        status: TaskStatus::Pending,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+        cancelled: false,
+    };
+
+    {
+        let db = state.db.lock().await;
+        db.create_upload_task(&task).map_err(|e| {
+            error!(upload_id = %upload_id, error = %e, "Failed to create upload task");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    }
 
     let temp_path = state
         .config
@@ -120,6 +151,14 @@ pub async fn upload_chunk(
 
     debug!(upload_id = %query.upload_id, chunk_index = query.chunk_index, "Receiving chunk");
 
+    // Check for cancellation
+    if let Some(token) = state.active_uploads.lock().await.get(&query.upload_id)
+        && token.is_cancelled()
+    {
+        warn!(upload_id = %query.upload_id, chunk_index = query.chunk_index, "Upload has been cancelled");
+        return Err(StatusCode::REQUEST_TIMEOUT);
+    }
+
     // Get upload session
     let session = {
         let db = state.db.lock().await;
@@ -141,6 +180,17 @@ pub async fn upload_chunk(
         });
         StatusCode::NOT_FOUND
     })?;
+
+    // Update task status to uploading
+    {
+        let db = state.db.lock().await;
+        if let Ok(Some(mut task)) = db.get_upload_task(&query.upload_id) &&
+            matches!(task.status, TaskStatus::Pending) {
+            task.status = TaskStatus::Uploading;
+            task.updated_at = chrono::Utc::now();
+            let _ = db.create_upload_task(&task);
+        }
+    }
 
     // Receive chunk data
     let mut chunk_data: Option<Vec<u8>> = None;
@@ -268,6 +318,22 @@ pub async fn complete_upload(
 ) -> Result<impl IntoResponse, StatusCode> {
     let start = Instant::now();
     info!(upload_id = %upload_id, "Starting upload completion");
+
+    // Check for cancellation
+    if let Some(token) = state.active_uploads.lock().await.get(&upload_id)
+        && token.is_cancelled()
+    {
+        warn!(upload_id = %upload_id, "Upload has been cancelled");
+
+        // Clean up session
+        let db = state.db.lock().await;
+        let _ = db.delete_upload_session(&upload_id);
+
+        // Remove from active uploads
+        state.active_uploads.lock().await.remove(&upload_id);
+
+        return Err(StatusCode::REQUEST_TIMEOUT);
+    }
 
     // Get upload session
     let session = {
@@ -507,6 +573,19 @@ pub async fn complete_upload(
         let db = state.db.lock().await;
         db.delete_upload_session(&upload_id).ok();
     }
+
+    // Update task status to completed
+    {
+        let db = state.db.lock().await;
+        if let Ok(Some(mut task)) = db.get_upload_task(&upload_id) {
+            task.status = TaskStatus::Completed;
+            task.updated_at = chrono::Utc::now();
+            let _ = db.create_upload_task(&task);
+        }
+    }
+
+    // Remove from active uploads
+    state.active_uploads.lock().await.remove(&upload_id);
 
     let total_elapsed = start.elapsed().as_millis();
     info!(
