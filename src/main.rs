@@ -9,6 +9,7 @@ mod qr;
 mod server;
 mod startup;
 mod sync;
+mod thumbnail;
 mod websocket;
 
 use clap::Parser;
