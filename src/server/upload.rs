@@ -199,10 +199,10 @@ pub async fn upload_chunk(
         // Estimate: use actual bytes from saved chunks
         let chunk_files = std::fs::read_dir(&session.temp_path)
             .ok()
-            .and_then(|entries| {
-                Some(entries.filter_map(|e| e.ok())
+            .map(|entries| {
+                entries.filter_map(|e| e.ok())
                     .filter(|e| e.file_name().to_string_lossy().starts_with("chunk_"))
-                    .count() as i64 * chunk_size as i64)
+                    .count() as i64 * chunk_size as i64
             })
             .unwrap_or(0);
         chunk_files.min(session.total_size)

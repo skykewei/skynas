@@ -87,6 +87,7 @@ pub enum TaskStatus {
 }
 
 impl TaskStatus {
+    #[allow(dead_code)]
     pub fn as_str(&self) -> &'static str {
         match self {
             TaskStatus::Pending => "pending",

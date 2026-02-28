@@ -286,6 +286,7 @@ impl Database {
     }
 
     // Upload Task operations
+    #[allow(dead_code)]
     pub fn create_upload_task(&self, task: &UploadTask) -> Result<()> {
         self.conn.execute(
             "INSERT INTO upload_tasks (id, filename, album, total_bytes, received_bytes, status, created_at, updated_at, cancelled)
