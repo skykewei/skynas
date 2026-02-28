@@ -362,19 +362,67 @@ async fn upload_handler(
         };
 
         debug!(upload_id = %upload_id, "Saving photo to database");
-        {
+        let photo_id_res = {
             let db = state.db.lock().await;
-            if let Err(e) = db.insert_photo(&photo) {
-                error!(upload_id = %upload_id, filename = %filename, error = %e, "Failed to record photo in database");
-                let _ = state.event_sender.send(WsEvent::UploadError {
-                    upload_id: upload_id.clone(),
-                    filename: filename.clone(),
-                    error: format!("Database error: {}", e),
-                    stage: "database".to_string(),
-                });
-            } else {
-                info!(upload_id = %upload_id, photo_id = photo.id, "Photo recorded in database");
+            match db.insert_photo(&photo) {
+                Ok(id) => {
+                    info!(upload_id = %upload_id, photo_id = id, "Photo recorded in database");
+                    Some(id)
+                }
+                Err(e) => {
+                    error!(upload_id = %upload_id, filename = %filename, error = %e, "Failed to record photo in database");
+                    let _ = state.event_sender.send(WsEvent::UploadError {
+                        upload_id: upload_id.clone(),
+                        filename: filename.clone(),
+                        error: format!("Database error: {}", e),
+                        stage: "database".to_string(),
+                    });
+                    None
+                }
             }
+        };
+
+        // Generate thumbnail asynchronously (only for image files)
+        let is_image = filename.to_lowercase().ends_with(".jpg")
+            || filename.to_lowercase().ends_with(".jpeg")
+            || filename.to_lowercase().ends_with(".png")
+            || filename.to_lowercase().ends_with(".heic")
+            || filename.to_lowercase().ends_with(".webp");
+
+        if let (true, Some(photo_id)) = (is_image, photo_id_res) {
+            let file_path_clone = file_path.clone();
+            let config_clone = state.config.clone();
+            let db_arc = state.db.clone();
+
+            tokio::spawn(async move {
+                match crate::thumbnail::ThumbnailGenerator::generate(
+                    &file_path_clone,
+                    &config_clone,
+                    300, // thumbnail max edge size
+                ).await {
+                    Ok((thumb_path, width, height)) => {
+                        // Update photo record in database
+                        let db = db_arc.lock().await;
+                        if let Err(e) = db.conn.execute(
+                            "UPDATE photos SET thumbnail_path = ?1, width = ?2, height = ?3 WHERE id = ?4",
+                            rusqlite::params![
+                                thumb_path.to_string_lossy().to_string(),
+                                width,
+                                height,
+                                photo_id
+                            ],
+                        ) {
+                            tracing::error!("Failed to update photo thumbnail info: {}", e);
+                        } else {
+                            tracing::info!("Generated thumbnail for photo {}: {}x{}", photo_id, width, height);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to generate thumbnail: {}", e);
+                        // Thumbnail generation failure should not affect main flow
+                    }
+                }
+            });
         }
 
         // Send progress event - 100%
