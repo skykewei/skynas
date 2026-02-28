@@ -202,6 +202,34 @@ pub async fn upload_chunk(
             StatusCode::BAD_REQUEST
         })?
     {
+        // Check for cancellation during chunk reception
+        if let Some(token) = state.active_uploads.lock().await.get(&query.upload_id) {
+            if token.is_cancelled() {
+                warn!(upload_id = %query.upload_id, chunk_index = query.chunk_index, "Upload cancelled during chunk reception");
+
+                // Update task status to cancelled
+                let db = state.db.lock().await;
+                if let Ok(Some(mut task)) = db.get_upload_task(&query.upload_id) {
+                    task.status = TaskStatus::Cancelled;
+                    task.updated_at = chrono::Utc::now();
+                    let _ = db.create_upload_task(&task);
+                }
+
+                // Send cancellation event
+                let _ = state.event_sender.send(WsEvent::UploadError {
+                    upload_id: query.upload_id.clone(),
+                    filename: "unknown".to_string(),
+                    error: "Upload cancelled by user".to_string(),
+                    stage: "cancelled".to_string(),
+                });
+
+                // Remove from active uploads
+                state.active_uploads.lock().await.remove(&query.upload_id);
+
+                return Err(StatusCode::REQUEST_TIMEOUT);
+            }
+        }
+
         if field.name() == Some("chunk") {
             let data = field.bytes().await.map_err(|e| {
                 error!(upload_id = %query.upload_id, chunk_index = query.chunk_index, error = %e, "Failed to read chunk bytes");
