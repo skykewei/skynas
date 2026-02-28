@@ -561,10 +561,227 @@
             }
         }
 
-        // 其他页面占位
-        function renderUploadsPage(container) {
-            container.innerHTML = '<div style="padding: 20px;"><h2>传输状态</h2><p>开发中...</p></div>';
+        // 传输状态页面
+        let ws = null;
+        let activeUploads = new Map();
+
+        async function renderUploadsPage(container) {
+            container.innerHTML = `
+                <div style="padding: 20px; padding-bottom: 80px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0;">传输状态</h2>
+                        <button id="cancelAllBtn" style="padding: 8px 16px; background: #ff4444; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">
+                            取消所有
+                        </button>
+                    </div>
+                    <div id="uploadsList" style="display: flex; flex-direction: column; gap: 15px;"></div>
+                    <div id="emptyState" style="text-align: center; padding: 60px 20px; color: #999; display: none;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">&#128203;</div>
+                        <p>当前没有传输任务</p>
+                    </div>
+                    <button id="cleanupBtn" style="width: 100%; padding: 12px; margin-top: 20px; background: #666; color: white; border: none; border-radius: 10px; cursor: pointer; display: none;">
+                        清理未完成上传块
+                    </button>
+                </div>
+            `;
+
+            // 加载当前传输任务
+            await loadActiveUploads();
+
+            // 连接 WebSocket 实时更新
+            connectWebSocket();
+
+            // 绑定取消所有按钮
+            document.getElementById('cancelAllBtn').addEventListener('click', async () => {
+                if (!confirm('确定要取消所有传输任务吗？')) return;
+                try {
+                    const res = await fetch('/api/uploads/cancel-all', { method: 'POST' });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast(`已取消 ${data.cancelled_count} 个任务`);
+                    }
+                } catch (e) {
+                    showToast('取消失败: ' + e.message, 'error');
+                }
+            });
+
+            // 绑定清理按钮（仅管理员可见）
+            document.getElementById('cleanupBtn').addEventListener('click', async () => {
+                if (!confirm('确定要清理所有未完成的上传块吗？')) return;
+                try {
+                    const res = await fetch('/api/uploads/cleanup-incomplete', { method: 'DELETE' });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast(`清理完成，释放 ${formatSize(data.freed_bytes)}`);
+                    }
+                } catch (e) {
+                    showToast('清理失败: ' + e.message, 'error');
+                }
+            });
         }
+
+        async function loadActiveUploads() {
+            try {
+                const res = await fetch('/api/uploads/active');
+                const uploads = await res.json();
+
+                uploads.forEach(upload => {
+                    activeUploads.set(upload.id, upload);
+                });
+
+                renderUploadsList();
+            } catch (e) {
+                console.error('加载传输任务失败:', e);
+            }
+        }
+
+        function renderUploadsList() {
+            const list = document.getElementById('uploadsList');
+            const emptyState = document.getElementById('emptyState');
+
+            if (activeUploads.size === 0) {
+                list.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            list.innerHTML = '';
+
+            activeUploads.forEach(upload => {
+                const item = document.createElement('div');
+                item.style.cssText = 'background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);';
+                item.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div>
+                            <div style="font-weight: 500; margin-bottom: 4px;">${upload.filename}</div>
+                            <div style="font-size: 12px; color: #666;">&#128193; ${upload.album}</div>
+                        </div>
+                        <button onclick="cancelUpload('${upload.id}')" style="padding: 6px 12px; background: #ff4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                            取消
+                        </button>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 4px;">
+                            <span>${upload.status === 'uploading' ? '上传中...' : '等待中'}</span>
+                            <span>${upload.progress_percent}% (${formatSize(upload.received_bytes)} / ${formatSize(upload.total_bytes)})</span>
+                        </div>
+                        <div style="height: 6px; background: #eee; border-radius: 3px; overflow: hidden;">
+                            <div style="height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); width: ${upload.progress_percent}%; transition: width 0.3s;"></div>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        async function cancelUpload(id) {
+            try {
+                const res = await fetch(`/api/uploads/${id}/cancel`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    activeUploads.delete(id);
+                    renderUploadsList();
+                    showToast('已取消上传');
+                }
+            } catch (e) {
+                showToast('取消失败: ' + e.message, 'error');
+            }
+        }
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                switch (data.type) {
+                    case 'UploadStarted':
+                        activeUploads.set(data.upload_id, {
+                            id: data.upload_id,
+                            filename: data.filename,
+                            album: data.album,
+                            total_bytes: data.total_bytes,
+                            received_bytes: 0,
+                            progress_percent: 0,
+                            status: 'uploading'
+                        });
+                        renderUploadsList();
+                        break;
+
+                    case 'UploadProgress':
+                        const upload = activeUploads.get(data.upload_id);
+                        if (upload) {
+                            upload.received_bytes = data.received_bytes;
+                            upload.progress_percent = data.percent;
+                            renderUploadsList();
+                        }
+                        break;
+
+                    case 'UploadComplete':
+                        activeUploads.delete(data.upload_id);
+                        renderUploadsList();
+                        showToast(`${data.filename} 上传完成`);
+                        // 如果在照片页面，刷新列表
+                        if (location.hash === '#photos') {
+                            loadPhotos();
+                        }
+                        break;
+
+                    case 'UploadError':
+                        activeUploads.delete(data.upload_id);
+                        renderUploadsList();
+                        showToast(`${data.filename} 上传失败: ${data.error}`, 'error');
+                        break;
+                }
+            };
+
+            ws.onclose = () => {
+                // 3秒后重新连接
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 100px;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 12px 24px;
+                background: ${type === 'error' ? '#ff4444' : '#4CAF50'};
+                color: white;
+                border-radius: 8px;
+                font-size: 14px;
+                z-index: 3000;
+                animation: fadeIn 0.3s;
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = 'fadeOut 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // 添加动画样式
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+                to { opacity: 1; transform: translateX(-50%) translateY(0); }
+            }
+            @keyframes fadeOut {
+                from { opacity: 1; }
+                to { opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
 
         function renderAdminPage(container) {
             container.innerHTML = '<div style="padding: 20px;"><h2>管理后台</h2><p>开发中...</p></div>';
