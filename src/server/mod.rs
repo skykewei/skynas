@@ -29,7 +29,7 @@ use uploads::{
 };
 
 mod photos;
-use photos::{get_photo, get_thumbnail, list_albums, list_photos};
+use photos::{delete_photo, get_image, get_photo, get_thumbnail, list_albums, list_photos};
 
 mod admin;
 use admin::{admin_login, get_admin_stats, get_config, update_config, validate_storage_path};
@@ -73,6 +73,7 @@ pub async fn run_server(config: Config, db: Database) -> anyhow::Result<()> {
         .route("/api/albums", get(list_albums))
         .route("/api/photos/:id", get(get_photo))
         .route("/api/photos/:id/thumbnail", get(get_thumbnail))
+        .route("/api/photos/:id/image", get(get_image))
         .route("/api/uploads/active", get(list_active_uploads))
         .route("/api/uploads/:id/cancel", post(cancel_upload))
         .route("/api/uploads/cancel-all", post(cancel_all_uploads))
@@ -96,6 +97,13 @@ pub async fn run_server(config: Config, db: Database) -> anyhow::Result<()> {
         .route(
             "/api/admin/config/validate-storage",
             post(validate_storage_path).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin_auth,
+            )),
+        )
+        .route(
+            "/api/photos/:id",
+            delete(delete_photo).layer(middleware::from_fn_with_state(
                 state.clone(),
                 require_admin_auth,
             )),
