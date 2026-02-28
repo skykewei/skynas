@@ -31,6 +31,11 @@ use uploads::{
 mod photos;
 use photos::{get_photo, get_thumbnail, list_albums, list_photos};
 
+mod admin;
+use admin::{admin_login, get_admin_stats, get_config, update_config, validate_storage_path};
+use crate::auth::require_admin_auth;
+use axum::middleware;
+
 #[derive(Clone)]
 pub struct AppState {
     pub config: Config,
@@ -72,6 +77,29 @@ pub async fn run_server(config: Config, db: Database) -> anyhow::Result<()> {
         .route("/api/uploads/:id/cancel", post(cancel_upload))
         .route("/api/uploads/cancel-all", post(cancel_all_uploads))
         .route("/api/uploads/cleanup-incomplete", delete(cleanup_incomplete_uploads))
+        // Admin routes
+        .route("/api/admin/login", post(admin_login))
+        .route(
+            "/api/admin/stats",
+            get(get_admin_stats).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin_auth,
+            )),
+        )
+        .route(
+            "/api/admin/config",
+            get(get_config).put(update_config).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin_auth,
+            )),
+        )
+        .route(
+            "/api/admin/config/validate-storage",
+            post(validate_storage_path).layer(middleware::from_fn_with_state(
+                state.clone(),
+                require_admin_auth,
+            )),
+        )
         .nest_service("/static", ServeDir::new("src/server/static"))
         .layer(CorsLayer::permissive())
         .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100MB limit for streaming
