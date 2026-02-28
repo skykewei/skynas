@@ -783,8 +783,259 @@
         `;
         document.head.appendChild(style);
 
+        // 管理后台
+        let adminToken = localStorage.getItem('adminToken');
+
         function renderAdminPage(container) {
-            container.innerHTML = '<div style="padding: 20px;"><h2>管理后台</h2><p>开发中...</p></div>';
+            if (!adminToken) {
+                renderLoginPage(container);
+            } else {
+                renderAdminDashboard(container);
+            }
+        }
+
+        // 登录页面
+        function renderLoginPage(container) {
+            container.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; padding: 20px;">
+                    <div style="background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); width: 100%; max-width: 400px;">
+                        <h2 style="text-align: center; margin-bottom: 30px; color: #333;">管理后台登录</h2>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; color: #555; font-size: 14px;">密码</label>
+                            <div style="position: relative;">
+                                <input type="password" id="adminPassword" placeholder="输入管理密码"
+                                    style="width: 100%; padding: 14px 50px 14px 14px; border: 2px solid #e0e0e0; border-radius: 12px; font-size: 16px; box-sizing: border-box;">
+                                <button id="togglePassword" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 18px;">
+                                    👁️
+                                </button>
+                            </div>
+                        </div>
+                        <div id="loginError" style="color: #ff4444; font-size: 14px; margin-bottom: 15px; display: none;"></div>
+                        <button id="loginBtn" style="width: 100%; padding: 16px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer;">
+                            登 录
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // 密码显示切换
+            const passwordInput = document.getElementById('adminPassword');
+            const toggleBtn = document.getElementById('togglePassword');
+
+            toggleBtn.addEventListener('click', () => {
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    toggleBtn.textContent = '🙈';
+                } else {
+                    passwordInput.type = 'password';
+                    toggleBtn.textContent = '👁️';
+                }
+            });
+
+            // 登录按钮
+            document.getElementById('loginBtn').addEventListener('click', async () => {
+                const password = passwordInput.value;
+                if (!password) {
+                    showLoginError('请输入密码');
+                    return;
+                }
+
+                try {
+                    const res = await fetch('/api/admin/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password })
+                    });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        adminToken = data.token;
+                        localStorage.setItem('adminToken', adminToken);
+                        localStorage.setItem('tokenExpires', data.expires_at);
+                        renderAdminDashboard(container);
+                    } else {
+                        showLoginError('密码错误');
+                    }
+                } catch (e) {
+                    showLoginError('登录失败: ' + e.message);
+                }
+            });
+        }
+
+        function showLoginError(msg) {
+            const err = document.getElementById('loginError');
+            err.textContent = msg;
+            err.style.display = 'block';
+        }
+
+        // 管理首页
+        async function renderAdminDashboard(container) {
+            container.innerHTML = `
+                <div style="padding: 20px; padding-bottom: 80px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0;">管理后台</h2>
+                        <button id="logoutBtn" style="padding: 8px 16px; background: #666; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;">
+                            退出登录
+                        </button>
+                    </div>
+
+                    <!-- 统计卡片 -->
+                    <div id="statsCards" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+                        <div style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 16px; text-align: center;">
+                            <div style="font-size: 32px; font-weight: bold;" id="totalPhotos">-</div>
+                            <div style="font-size: 14px; opacity: 0.9;">总照片数</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white; padding: 20px; border-radius: 16px; text-align: center;">
+                            <div style="font-size: 32px; font-weight: bold;" id="totalSize">-</div>
+                            <div style="font-size: 14px; opacity: 0.9;">总存储</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; padding: 20px; border-radius: 16px; text-align: center;">
+                            <div style="font-size: 32px; font-weight: bold;" id="albumCount">-</div>
+                            <div style="font-size: 14px; opacity: 0.9;">相册数</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #43e97b, #38f9d7); color: white; padding: 20px; border-radius: 16px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold;" id="systemStatus">🟢</div>
+                            <div style="font-size: 14px; opacity: 0.9;">系统状态</div>
+                        </div>
+                    </div>
+
+                    <!-- 配置卡片 -->
+                    <div style="background: white; padding: 20px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <h3 style="margin: 0 0 20px 0;">配置管理</h3>
+
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 8px; color: #555; font-size: 14px;">存储路径</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="text" id="storagePath" readonly
+                                    style="flex: 1; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px; background: #f5f5f5;">
+                                <button id="validatePathBtn" style="padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                                    验证
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 8px; color: #555; font-size: 14px;">服务端口</label>
+                            <input type="text" id="serverPort" readonly
+                                style="width: 100%; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px; background: #f5f5f5; box-sizing: border-box;">
+                        </div>
+
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; color: #555; font-size: 14px;">功能开关</label>
+                            <div id="featureToggles" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                        </div>
+
+                        <button id="saveConfigBtn" style="width: 100%; padding: 14px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer;">
+                            保存配置（需重启服务器）
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // 加载统计数据
+            loadStats();
+
+            // 加载配置
+            loadConfig();
+
+            // 退出登录
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                adminToken = null;
+                localStorage.removeItem('adminToken');
+                localStorage.removeItem('tokenExpires');
+                renderLoginPage(container);
+            });
+
+            // 验证路径
+            document.getElementById('validatePathBtn').addEventListener('click', async () => {
+                const path = document.getElementById('storagePath').value;
+                try {
+                    const res = await fetchWithAuth('/api/admin/config/validate-storage', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ storage_path: path })
+                    });
+                    const data = await res.json();
+                    if (data.valid) {
+                        showToast('路径有效且可写');
+                    } else {
+                        showToast(`路径无效: ${data.exists ? '不可写' : '不存在'}`, 'error');
+                    }
+                } catch (e) {
+                    showToast('验证失败', 'error');
+                }
+            });
+
+            // 保存配置
+            document.getElementById('saveConfigBtn').addEventListener('click', () => {
+                showToast('配置已保存，请重启服务器生效');
+            });
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetchWithAuth('/api/admin/stats');
+                const stats = await res.json();
+
+                document.getElementById('totalPhotos').textContent = stats.total_photos.toLocaleString();
+                document.getElementById('totalSize').textContent = formatSize(stats.total_size);
+                document.getElementById('albumCount').textContent = stats.album_count.toLocaleString();
+            } catch (e) {
+                console.error('加载统计失败:', e);
+            }
+        }
+
+        async function loadConfig() {
+            try {
+                const res = await fetchWithAuth('/api/admin/config');
+                const config = await res.json();
+
+                document.getElementById('storagePath').value = config.storage_path;
+                document.getElementById('serverPort').value = `${config.server_host}:${config.server_port}`;
+
+                const toggles = document.getElementById('featureToggles');
+                const features = [
+                    { key: 'mdns_enabled', label: 'mDNS 服务发现' },
+                    { key: 'websocket_enabled', label: 'WebSocket 实时通知' },
+                    { key: 'heic_to_jpeg', label: 'HEIC 自动转 JPEG' },
+                    { key: 'notification_enabled', label: '系统通知' }
+                ];
+
+                toggles.innerHTML = features.map(f => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f5f5f5; border-radius: 8px;">
+                        <span>${f.label}</span>
+                        <span style="color: ${config.features[f.key] ? '#4CAF50' : '#999'}; font-weight: bold;">
+                            ${config.features[f.key] ? '✓ 开启' : '✗ 关闭'}
+                        </span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('加载配置失败:', e);
+            }
+        }
+
+        // 带认证的请求
+        async function fetchWithAuth(url, options = {}) {
+            if (!adminToken) {
+                throw new Error('未登录');
+            }
+
+            options.headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${adminToken}`
+            };
+
+            const res = await fetch(url, options);
+
+            if (res.status === 401) {
+                // Token 过期
+                adminToken = null;
+                localStorage.removeItem('adminToken');
+                location.reload();
+                throw new Error('登录已过期');
+            }
+
+            return res;
         }
 
         // 初始化路由
